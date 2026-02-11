@@ -67,9 +67,8 @@ head(kidney_full)
 
 #second part
 ```{r}
-Checking for missing variables and visualising:
+#Checking for missing variables and visualising:
 
-```{r}
 type_map <- tibble::tibble(
   variable    = names(kidney_full),
   class       = sapply(kidney_full, \(x) paste(class(x), collapse = "/")),
