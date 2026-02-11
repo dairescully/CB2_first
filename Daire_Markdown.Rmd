@@ -1,0 +1,552 @@
+---
+title: "Kidney_CB2_Project"
+author: "Daire Scully"
+date: "2026-02-11"
+output: html_document
+---
+
+
+```{r}
+# Packages needed in this section
+req_pkgs <- c(
+  "dplyr",      # data wrangling
+  "ggplot2",    # plotting
+  "tidyr",      # tidying
+  "readr",      # read/write csv
+  "tibble",     # tibbles/printing
+  "gridExtra",  # simple plot grids
+  "emmeans",    # adjusted means / contrasts
+  "effsize",     # effect sizes (Cohen's d, Cliff's delta)
+ "DataExplorer" ,#for missingness
+  "glmnet",
+ "lmtest" ,# for checking the 
+ "pROC"
+ )
+
+# Install any that are missing
+to_install <- setdiff(req_pkgs, rownames(installed.packages()))
+if (length(to_install) > 0) {
+  install.packages(to_install, dependencies = TRUE)
+}
+# Load all (silently)
+invisible(lapply(req_pkgs, require, character.only = TRUE))
+
+```
+
+
+```{r}
+getwd()
+setwd("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first")
+file.exists("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first/dataset02_kidney_FULL.csv")
+```
+
+```{r}
+kidney_full <- read.csv("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first/dataset02_kidney_FULL.csv")
+head(kidney_full) #as less than 15 columns
+str(kidney_full[, 1:10])
+str(kidney_full)
+```
+
+```{r}
+kidney_full <- kidney_full %>%
+  dplyr::mutate(
+    adherence_level = dplyr::case_when(
+      protocol_adherence >= 0.6 ~ "High adherence",
+      protocol_adherence <  0.6 ~ "Low adherence",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  dplyr::mutate(
+    adherence_level = factor(
+      adherence_level,
+      levels = c("Low adherence", "High adherence")
+    )
+  )
+head(kidney_full)
+```
+
+#second part
+```{r}
+Checking for missing variables and visualising:
+
+```{r}
+type_map <- tibble::tibble(
+  variable    = names(kidney_full),
+  class       = sapply(kidney_full, \(x) paste(class(x), collapse = "/")),
+  n_missing   = sapply(kidney_full, \(x) sum(is.na(x))),
+  pct_missing = round(100 * sapply(kidney_full, \(x) mean(is.na(x))), 2),
+  n_unique    = sapply(kidney_full, \(x) dplyr::n_distinct(x)),
+  example     = sapply(kidney_full, \(x) paste(utils::head(unique(x), 3), collapse = ", "))
+)
+library(dplyr)
+type_map %>% arrange(desc(class))
+library(ggplot2)
+ggplot(type_map %>% arrange(desc(pct_missing)), aes(x = variable, y = pct_missing)) +
+  geom_col() + scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, .05)))
+```
+
+Exploratory analysis and visualisation:
+
+```{r}
+p1 <- ggplot(kidney_full, aes(delta_creatinine_48h)) + geom_histogram(bins = 30) +
+  labs(x = "Percentage Change", y = "Count")
+p2 <- ggplot(kidney_full, aes(x = ifelse(bun < 20, "< 20", "≥ 20"))) + geom_bar() +
+  labs(x = "High BUN (≥20%)", y = "Count")
+p3 <- ggplot(kidney_full, aes(baseline_creat)) + geom_histogram(bins = 30) +
+  labs(x = "Baseline Creatinine", y = "Count")
+p4 <- ggplot(kidney_full, aes(age)) + geom_histogram(bins = 30) +
+  labs(x = "Age (years)", y = "Count")
+p5 <- ggplot(kidney_full, aes(protocol_adherence)) + geom_histogram(bins = 30) +
+  labs(x = "Protocol Adherence", y = "Count")
+p6 <- ggplot(kidney_full, aes(sofa)) + geom_histogram(bins = 30) +
+  labs(x = "SOFA Score", y = "Count")
+p7 <- ggplot(kidney_full, aes(site)) + geom_bar() +
+  labs(x = "ICU Site", y = "Count")
+p8 <- ggplot(kidney_full, aes(x = ifelse(protocol_adherence < 0.7, "< 70%", "≥ 70%"))) + geom_bar() +
+  labs(x = "High Adherence (≥70%)", y = "Count")
+gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
+```
+
+```{r}
+ggplot(kidney_full, aes(baseline_creat, delta_creatinine_48h, color = sofa)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Baseline Creatinine", y = "Delta Creatinine", color = "SOFA score")
+
+ggplot(kidney_full, aes(delta_creatinine_48h, protocol_adherence)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Creatinine after 48h", y = "Protocol Adherence")
+
+ggplot(kidney_full, aes(baseline_creat, delta_creatinine_48h, color = protocol_adherence)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Baseline Creatinine", y = "Delta Creatinine", color = "Protocol Adherence")
+
+ggplot(kidney_full, aes(baseline_creat, protocol_adherence, color = delta_creatinine_48h < 0 )) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Baseline Creatinine", y = "Protocol Adherence", color = "Creatinine after 48h less than 0")
+```
+
+```{r}
+ggplot(kidney_full, aes(sofa > 7, delta_creatinine_48h)) +
+  geom_boxplot() +
+  labs(x = "SOFA Score >7", y = "Delta Creatinine (after 48h)")
+
+ggplot(kidney_full, aes(sofa > 7, delta_creatinine_48h)) +
+  geom_boxplot(outlier.shape = NA, width = 0.6) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.15) +
+  labs(x = "SOFA Score >7", y = "Creatinine after 48h")
+
+ggplot(kidney_full, aes(protocol_adherence > 0.8, delta_creatinine_48h)) +
+  geom_boxplot() +
+  labs(x = "Protocol Adherence > 80%", y = "Delta Creatinine (after 48h)")
+```
+
+Summarising the Dataset:
+
+```{r}
+kidney_full %>%
+  group_by(sofa) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(baseline_creat),
+    sd     = sd(baseline_creat),
+    median = median(baseline_creat),
+    q1     = quantile(baseline_creat, 0.25),
+    q3     = quantile(baseline_creat, 0.75)
+  )
+
+kidney_full %>%
+  group_by(protocol_adherence) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(delta_creatinine_48h),
+    sd     = sd(delta_creatinine_48h),
+    median = median(delta_creatinine_48h),
+    q1     = quantile(delta_creatinine_48h, 0.25),
+    q3     = quantile(delta_creatinine_48h, 0.75)
+  )
+```
+
+Determining Correlation:
+
+```{r}
+lab_markers <- c("bun", "crp", "albumin", "lactate", "map_min", "sofa")
+cors <- sapply(lab_markers, function(g) {
+  suppressWarnings(cor(kidney_full[[g]], kidney_full$baseline_creat, use = "pairwise.complete.obs"))
+})
+top_marker <- names(sort(abs(cors), decreasing = TRUE))
+top_mark <- tibble::tibble(
+  Marker = top_marker,
+  cor  = unname(cors[top_marker])
+) %>%
+  dplyr::mutate(Marker = reorder(Marker, abs(cor)))
+
+ggplot(top_mark, aes(x = Marker, y = cor, fill = cor > 0)) +
+  geom_col() +
+  coord_flip() +
+  guides(fill = "none") +
+  labs(x = "Laboratory Markers", y = "Correlation with Baseline Creatinine",
+       title = "Top Lab Markers by absolute correlation")
+```
+
+```{r}
+Proto <- c("protocol_adherence")
+correl <- sapply(Proto, function(g) {
+  suppressWarnings(cor(kidney_full[[g]], kidney_full$delta_creatinine_48h, use = "pairwise.complete.obs"))
+})
+
+top_mark <- tibble::tibble(
+  Mark = correl,
+  corr  = unname(cors[correl])
+) %>%
+  dplyr::mutate(Mark = reorder(Mark, abs(corr)))
+
+ggplot(top_mark, aes(x = Mark, y = corr, fill = corr > 0)) +
+  geom_col() +
+  coord_flip() +
+  guides(fill = "none") +
+  labs(x = "Protocol Adherence", y = "Correlation with Delta Creatinine",
+       title = "Protocol Adherence by absolute correlation")
+```
+
+Linear Regression:
+
+```{r}
+ggplot(kidney_full, aes(x = sofa, y = delta_creatinine_48h, colour = protocol_adherence)) +
+geom_point(alpha = 0.7) +
+geom_smooth(method = "lm", se = FALSE, color = "black") +
+labs( x = "SOFA Score", y = "Delta Creatinine (48h)", color = "protocol adherence") +
+theme_minimal()
+
+ggplot(kidney_full, aes(x = baseline_creat, y = delta_creatinine_48h, colour = protocol_adherence)) +
+geom_point(alpha = 0.7) +
+geom_smooth(method = "lm", se = FALSE, color = "black") +
+labs( x = "Baseline Creatinine", y = "Delta Creatinine (48h)", color = "protocol adherence") +
+theme_minimal()
+
+ggplot(kidney_full, aes(x = lactate, y = delta_creatinine_48h, colour = protocol_adherence)) +
+geom_point(alpha = 0.7) +
+geom_smooth(method = "lm", se = FALSE, color = "black") +
+labs( x = "Serum Lactate", y = "Delta Creatinine (48h)", color = "protocol adherence") +
+theme_minimal()
+
+ggplot(kidney_full, aes(x = baseline_creat, y = protocol_adherence, colour = delta_creatinine_48h < 0 )) +
+geom_point(alpha = 0.7) +
+geom_smooth(method = "lm", se = FALSE, color = "black") +
+labs( x = "Baseline Creatinine", y = "Protocol Adherence", color = "Creatinine change after 48h") +
+theme_minimal()
+```
+
+Calculating Error:
+
+```{r}
+# ---- 0) Metrics (MAE and RMSE) ----
+
+mae  <- function(y, yhat) mean(abs(y - yhat))
+rmse <- function(y, yhat) sqrt(mean((y - yhat)^2))
+
+# ---- evaluation function (MAE and RMSE) ----
+eval_perf <- function(y_true, y_pred) {
+  tibble(
+    MAE  = mae(y_true, y_pred),
+    RMSE = rmse(y_true, y_pred)
+  )
+}
+# alias to avoid mistyping
+eval_perform <- eval_perf
+```
+
+Splitting Data into Train and Test
+
+```{r}
+set.seed(42)
+# ---- 1) Train/Test split (70/30) ----
+n  <- nrow(kidney_full)
+ix <- sample.int(n, size = floor(0.7 * n))
+train <- kidney_full[ix, , drop = FALSE]
+test  <- kidney_full[-ix, , drop = FALSE]
+
+# ---- 2) Remove columns that must NOT enter the model ----
+# (ID and the binary endpoint; keeps the supervised task as a pure regression)
+
+drop_cols <- intersect(names(train), c("patient_id", "protocol_adherence", "site"))
+train_nopii <- dplyr::select(train, -dplyr::all_of(drop_cols))
+test_nopii  <- dplyr::select(test,  -dplyr::all_of(drop_cols))
+
+# Common formula for OLS (and to derive terms/dummies for glmnet)
+f_ols <- delta_creatinine_48h ~ .
+
+# ---- 3) Capture TRAIN terms to ensure identical dummies in TEST ----
+# (fit a temporary OLS only to extract terms & factor levels)
+
+ols_tmp   <- lm(f_ols, data = train_nopii)
+ols_terms <- terms(ols_tmp)
+
+# Consistent design matrices for glmnet (no intercept column)
+X_train <- model.matrix(ols_terms, data = train_nopii)[, -1, drop = FALSE]
+X_test  <- model.matrix(ols_terms, data = test_nopii)[,  -1, drop = FALSE]
+y_train <- train_nopii$delta_creatinine_48h
+y_test  <- test_nopii$delta_creatinine_48h
+
+# ---- 4) OLS (uses data.frame; glmnet uses X/y) ----
+mod_ols        <- lm(f_ols, data = train_nopii)
+pred_ols_train <- predict(mod_ols, newdata = train_nopii)
+pred_ols_test  <- predict(mod_ols, newdata = test_nopii)
+
+  #| label: ols-assumptions
+  #| message: false
+  #| warning: false
+  suppressPackageStartupMessages({
+    library(ggplot2)
+    library(dplyr)
+    library(lmtest)    # bptest(), dwtest()
+    library(sandwich)  # robust (HC) variance estimators
+    library(car)       # vif(), crPlots(), outlierTest()
+  })
+  
+  # --- 1) Quick base-R diagnostic panel (residuals, QQ, Scale-Location, Residuals vs Leverage)
+op <- par(mfrow = c(2, 2))
+plot(mod_ols)
+```
+
+OLS:
+
+```{r}
+# --- Evaluate OLS with MAE and RMSE (using eval_perf) ---
+# y vectors (true values)
+y_train <- train_nopii$delta_creatinine_48h
+y_test  <- test_nopii$delta_creatinine_48h
+
+perf_ols_train <- eval_perf(y_train, pred_ols_train) |>
+  dplyr::mutate(Model = "OLS", Dataset = "Train")
+
+perf_ols_test <- eval_perf(y_test, pred_ols_test) |>
+  dplyr::mutate(Model = "OLS", Dataset = "Test")
+
+# Compact table
+dplyr::bind_rows(perf_ols_train, perf_ols_test)
+```
+
+LASSO Regression:
+
+```{r}
+# ---- 5) LASSO (alpha = 1) with CV to choose lambda ----
+# Note: glmnet standardizes features by default (standardize = TRUE).
+library(glmnet)
+cv_lasso  <- cv.glmnet(X_train, y_train, alpha = 1, nfolds = 10)
+mod_lasso <- glmnet(X_train, y_train, alpha = 1, lambda = cv_lasso$lambda.min)
+pred_lasso_train <- as.numeric(predict(mod_lasso, newx = X_train))
+pred_lasso_test  <- as.numeric(predict(mod_lasso, newx = X_test))
+
+# Nonzero coefficients selected by LASSO
+coef_lasso <- coef(mod_lasso)
+nz <- which(coef_lasso != 0)
+as.matrix(coef_lasso[nz, , drop = FALSE])
+
+# Compare errors with your eval_perf()
+perf_lasso_train <- eval_perf(y_train, pred_lasso_train) |> dplyr::mutate(Model="LASSO", Dataset="Train")
+perf_lasso_test  <- eval_perf(y_test,  pred_lasso_test)  |> dplyr::mutate(Model="LASSO", Dataset="Test")
+dplyr::bind_rows(perf_lasso_train, perf_lasso_test)
+```
+
+Ridge Regression:
+
+```{r}
+# ---- 6) Ridge (alpha = 0) with CV ----
+cv_ridge  <- cv.glmnet(X_train, y_train, alpha = 0, nfolds = 10)
+mod_ridge <- glmnet(X_train, y_train, alpha = 0, lambda = cv_ridge$lambda.min)
+pred_ridge_train <- as.numeric(predict(mod_ridge, newx = X_train))
+pred_ridge_test  <- as.numeric(predict(mod_ridge, newx = X_test))
+
+# ---- Performance (MAE, RMSE) using eval_perform / eval_perf ----
+perf_ridge_train <- eval_perform(y_train, pred_ridge_train) |>
+  dplyr::mutate(Model = "Ridge", Dataset = "Train")
+
+perf_ridge_test <- eval_perform(y_test, pred_ridge_test) |>
+  dplyr::mutate(Model = "Ridge", Dataset = "Test")
+
+dplyr::bind_rows(perf_ridge_train, perf_ridge_test)
+
+# ---- Quick model “summary” for discussion ----
+# Lambdas chosen by CV
+cv_ridge$lambda.min
+
+cv_ridge$lambda.1se
+
+# Coefficients at lambda.min
+ridge_coefs <- as.matrix(coef(mod_ridge))
+ridge_coef_tbl <- tibble::tibble(
+  term     = rownames(ridge_coefs),
+  estimate = as.numeric(ridge_coefs[, 1])
+)
+
+# How many non-zero coefficients (excluding intercept)
+nnz <- ridge_coef_tbl |>
+  dplyr::filter(term != "(Intercept)", estimate != 0) |>
+  nrow()
+
+nnz
+
+# Top coefficients by absolute magnitude (exclude intercept)
+ridge_top <- ridge_coef_tbl |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::mutate(abs_est = abs(estimate)) |>
+  dplyr::arrange(dplyr::desc(abs_est)) |>
+  dplyr::slice(1:15)
+## seeing the top 15 features regarding estimate
+ridge_top
+```
+
+Elastic Net:
+
+```{r}
+# ---- 7) Elastic Net (tune alpha and lambda via CV) ----
+suppressPackageStartupMessages({
+  library(glmnet)
+  library(dplyr)
+  library(tibble)
+  # assumes eval_perform() already defined and X_train, X_test, y_train, y_test exist
+})
+
+set.seed(42)
+
+# Grid of alpha values (0=ridge, 1=lasso)
+alpha_grid <- seq(0.05, 0.95, by = 0.05)
+
+# For each alpha, run cv.glmnet to pick lambda; record CV error at lambda.min
+cv_list <- lapply(alpha_grid, function(a) {
+  cv.glmnet(X_train, y_train, alpha = a, nfolds = 10)
+})
+
+cv_errors <- sapply(cv_list, function(cv) min(cv$cvm))  # lower is better
+best_idx  <- which.min(cv_errors)
+best_alpha <- alpha_grid[best_idx]
+best_cv    <- cv_list[[best_idx]]
+best_lambda_min <- best_cv$lambda.min
+best_lambda_1se <- best_cv$lambda.1se
+
+best_alpha
+
+best_lambda_min
+
+best_lambda_1se
+
+# Fit final Elastic Net at best alpha/lambda
+mod_enet <- glmnet(X_train, y_train, alpha = best_alpha, lambda = best_lambda_min)
+
+# Predictions
+pred_enet_train <- as.numeric(predict(mod_enet, newx = X_train))
+pred_enet_test  <- as.numeric(predict(mod_enet, newx = X_test))
+
+# Performance
+perf_enet_train <- eval_perform(y_train, pred_enet_train) |>
+  mutate(Model = "Elastic Net", Dataset = "Train", alpha = best_alpha, lambda = best_lambda_min)
+
+perf_enet_test <- eval_perform(y_test, pred_enet_test) |>
+  mutate(Model = "Elastic Net", Dataset = "Test", alpha = best_alpha, lambda = best_lambda_min)
+
+bind_rows(perf_enet_train, perf_enet_test)
+
+# Coefficients summary
+enet_coefs <- as.matrix(coef(mod_enet))
+enet_coef_tbl <- tibble(
+  term     = rownames(enet_coefs),
+  estimate = as.numeric(enet_coefs[, 1])
+)
+
+# Count non-zero (excluding intercept)
+enet_nnz <- enet_coef_tbl |>
+  filter(term != "(Intercept)", estimate != 0) |>
+  nrow()
+enet_nnz
+
+# Top coefficients by absolute value (exclude intercept)
+enet_top <- enet_coef_tbl |>
+  filter(term != "(Intercept)") |>
+  mutate(abs_est = abs(estimate)) |>
+  arrange(desc(abs_est)) |>
+  slice(1:20)
+
+enet_top
+```
+
+Comparing Regression:
+
+```{r}
+# ---- 8) Side-by-side performance tables (MAE and RMSE)   now with Elastic Net ----
+# Assumes you already computed:
+#   pred_ols_train,  pred_ols_test
+#   pred_lasso_train, pred_lasso_test
+#   pred_ridge_train, pred_ridge_test
+#   pred_enet_train,  pred_enet_test
+# And (optionally) best_alpha, best_lambda_min from your Elastic Net CV
+
+# Helper: safely carry alpha/lambda for ENet if they exist
+alpha_enet  <- if (exists("best_alpha")) best_alpha else NA_real_
+lambda_enet <- if (exists("best_lambda_min")) best_lambda_min else NA_real_
+
+# Build TRAIN table
+metrics_train <- tibble(
+  Model = c("OLS", "LASSO (λ.min)", "Ridge (λ.min)", "Elastic Net")
+) |>
+  bind_cols(
+    dplyr::bind_rows(
+      eval_perf(y_train, pred_ols_train),
+      eval_perf(y_train, pred_lasso_train),
+      eval_perf(y_train, pred_ridge_train),
+      eval_perf(y_train, pred_enet_train)
+    )
+  ) |>
+  mutate(Alpha = c(NA, 1.00, 0.00, alpha_enet),
+         Lambda = c(NA, NA, NA, lambda_enet))
+
+# Build TEST table
+metrics_test <- tibble(
+  Model = c("OLS", "LASSO (λ.min)", "Ridge (λ.min)", "Elastic Net")
+) |>
+  bind_cols(
+    dplyr::bind_rows(
+      eval_perf(y_test, pred_ols_test),
+      eval_perf(y_test, pred_lasso_test),
+      eval_perf(y_test, pred_ridge_test),
+      eval_perf(y_test, pred_enet_test)
+    )
+  ) |>
+  mutate(Alpha = c(NA, 1.00, 0.00, alpha_enet),
+         Lambda = c(NA, NA, NA, lambda_enet))
+
+# Print results
+metrics_train
+
+metrics_test
+```
+
+Main Treatment effect:
+
+```{r}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(broom)
+  library(stringr)
+  library(tibble)
+  
+})
+
+# OLS: adjusted main effect of treatment (chemo vs reference)
+
+coef_ols <- tidy(mod_ols, conf.int = TRUE) %>%
+filter(term != "(intercept)")
+coef_ols
+
+
+```
+
+```
+
+
+
+
