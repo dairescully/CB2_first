@@ -35,12 +35,14 @@ invisible(lapply(req_pkgs, require, character.only = TRUE))
 
 
 ```{r}
+#set working directory and acknowledge dataset
 getwd()
 setwd("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first")
 file.exists("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first/dataset02_kidney_FULL.csv")
 ```
 
 ```{r}
+#setting kidney_full as the dataset name for R
 kidney_full <- read.csv("C:/Users/pbsstudent.L-1WTXKR3/Desktop/R Projects/CB2/Project 1 - Kidney/CB2_first/dataset02_kidney_FULL.csv")
 head(kidney_full) #as less than 15 columns
 str(kidney_full[, 1:10])
@@ -48,6 +50,7 @@ str(kidney_full)
 ```
 
 ```{r}
+#defining low and high adherance thersholds
 kidney_full <- kidney_full %>%
   dplyr::mutate(
     adherence_level = dplyr::case_when(
@@ -87,6 +90,7 @@ ggplot(type_map %>% arrange(desc(pct_missing)), aes(x = variable, y = pct_missin
 Exploratory analysis and visualisation:
 
 ```{r}
+#plots showing the counts of each variable in histogram and bar format
 p1 <- ggplot(kidney_full, aes(delta_creatinine_48h)) + geom_histogram(bins = 30) +
   labs(x = "Percentage Change", y = "Count")
 p2 <- ggplot(kidney_full, aes(x = ifelse(bun < 20, "< 20", "≥ 20"))) + geom_bar() +
@@ -107,6 +111,7 @@ gridExtra::grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol = 2)
 ```
 
 ```{r}
+#plots comparing variables to eachother
 ggplot(kidney_full, aes(baseline_creat, delta_creatinine_48h, color = sofa)) +
   geom_point(alpha = 0.6) +
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
@@ -129,6 +134,7 @@ ggplot(kidney_full, aes(baseline_creat, protocol_adherence, color = delta_creati
 ```
 
 ```{r}
+#examining relationship between sofa >7 on variable expression
 ggplot(kidney_full, aes(sofa > 7, delta_creatinine_48h)) +
   geom_boxplot() +
   labs(x = "SOFA Score >7", y = "Delta Creatinine (after 48h)")
@@ -147,6 +153,7 @@ ggplot(kidney_full, aes(protocol_adherence > 0.8, delta_creatinine_48h)) +
 Summarising the Dataset:
 
 ```{r}
+#statistical analysis of each sofa scoring and adherance group (n, mean, sd, median and q1 & 3)
 kidney_full %>%
   group_by(sofa) %>%
   summarise(
