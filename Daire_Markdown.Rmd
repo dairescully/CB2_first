@@ -6,6 +6,7 @@ output: html_document
 ---
 
 
+
 ```{r}
 # Packages needed in this section
 req_pkgs <- c(
@@ -175,6 +176,18 @@ kidney_full %>%
     q1     = quantile(delta_creatinine_48h, 0.25),
     q3     = quantile(delta_creatinine_48h, 0.75)
   )
+
+kidney_full %>%
+  group_by(creatinine_change) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(baseline_creat),
+    sd     = sd(baseline_creat),
+    median = median(baseline_creat),
+    q1     = quantile(baseline_creat, 0.25),
+    q3     = quantile(baseline_creat, 0.75)
+  )
+
 ```
 
 Determining Correlation:
