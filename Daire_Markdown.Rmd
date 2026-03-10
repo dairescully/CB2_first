@@ -6,7 +6,6 @@ output: html_document
 ---
 
 
-
 ```{r}
 # Packages needed in this section
 req_pkgs <- c(
@@ -373,6 +372,10 @@ dplyr::bind_rows(perf_lasso_train, perf_lasso_test)
 ```
 
 Ridge Regression:
+
+As part of our analysis we used a ridge regression. This is a regularized linear modelling technique that's particularly well suited for data sets made up of interrelated variables such as those used to assess kidney function. Unlike standard linear regression a penalty is applied which shrinks all coefficient estimates toward 0 but doesn't eliminate them entirely. In this example it was able to do so for creatinine, BUN, lactate and other lab markers.
+
+By keeping all of these variables in the model while shrinking their influence we can reduce overfitting so that our findings will be suitable for future patients and stabilizes coefficient estimates even thoguh there are correlations between the our predictors. This gives us a more reliable image of which factors are most strongly associated without having to remove potentially informative variables.
 
 ```{r}
 # ---- 6) Ridge (alpha = 0) with CV ----
