@@ -132,6 +132,7 @@ ggplot(kidney_full, aes(baseline_creat, protocol_adherence, color = delta_creati
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   labs(x = "Baseline Creatinine", y = "Protocol Adherence", color = "Creatinine after 48h less than 0")
 ```
+Creatinine is a waste product which is produced by normal muscle breakdown and glomerular filtration.Levels are stable in homeostatic conditions, it accumulates in the blood during decline of kidney function. Rises in creatinine can be an early indicator of kidney issues allowing earlier intervention by HCPs. It's use in this dataset allows us to see both long term and short term condition changes due to the frequency at which it is monitored.
 
 ```{r}
 #examining relationship between sofa >7 on variable expression
