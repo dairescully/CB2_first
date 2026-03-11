@@ -192,6 +192,10 @@ kidney_full %>%
 
 Determining Correlation:
 
+CRP:C-Reactive Protein is produced by the liver in response to inflammation. It is acute phase reactant (inflammation, infection or tissue damage) and a highly sensitive marker. It is used to monitor the presence and severity of inflammatory processes. 
+
+In the particular cohort we are dealing with here, CRP is particularly valuable.Inflammatory responses in ICU can be common indicators of sepsis, trauma, surgery or organ failure and rising or persistently high CRP levels can be an indicator of lack of treatment response. CRP is measured through routine blood tests making it also accessible and practical for serial monitoring at bedside settings. In our analysis CRP acts as an important clinical marker for understanding how inflammatory burden interacts with kidney function and other factors in the patient group.
+
 ```{r}
 lab_markers <- c("bun", "crp", "albumin", "lactate", "map_min", "sofa")
 cors <- sapply(lab_markers, function(g) {
