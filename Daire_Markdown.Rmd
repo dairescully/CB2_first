@@ -68,6 +68,25 @@ kidney_full <- kidney_full %>%
 head(kidney_full)
 ```
 
+```{r}
+kidney_full <- kidney_full %>%
+  dplyr::mutate(
+    creatinine_change = dplyr::case_when(
+      delta_creatinine_48h >= 0 ~ "Creat increased",
+      delta_creatinine_48h <  0 ~ "Creat reduced",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  dplyr::mutate(
+    creatinine_change = factor(
+      creatinine_change,
+      levels = c("Creat reduced", "Creat increased")
+    )
+  )
+head(kidney_full)
+```
+
+
 #second part
 ```{r}
 #Checking for missing variables and visualising:
@@ -88,6 +107,10 @@ ggplot(type_map %>% arrange(desc(pct_missing)), aes(x = variable, y = pct_missin
 ```
 
 Exploratory analysis and visualisation:
+
+Creatinine is a waste product which is produced by normal muscle breakdown and glomerular filtration.Levels are stable in homeostatic conditions, it accumulates in the blood during decline of kidney function. Rises in creatinine can be an early indicator of kidney issues allowing earlier intervention by HCPs. It's use in this dataset allows us to see both long term and short term condition changes due to the frequency at which it is monitored.
+
+Normal creatinine levels are generally 0.7 to 1.3 mg/dL for men and 0.6 to 1.1 mg/dL for women, reflecting healthy kidney function. Levels above 1.4 mg/dL (men) or 1.2 mg/dL (women) often indicate kidney dysfunction. A result of 1.6–2.0 mg/dL is considered moderately elevated, while levels 5.0 mg/dL may indicate severe damage.
 
 ```{r}
 #plots showing the counts of each variable in histogram and bar format
@@ -117,10 +140,10 @@ ggplot(kidney_full, aes(baseline_creat, delta_creatinine_48h, color = sofa)) +
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   labs(x = "Baseline Creatinine", y = "Delta Creatinine", color = "SOFA score")
 
-ggplot(kidney_full, aes(delta_creatinine_48h, protocol_adherence)) +
+ggplot(kidney_full, aes(delta_creatinine_48h, protocol_adherence, color = age)) +
   geom_point(alpha = 0.6) +
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
-  labs(x = "Creatinine after 48h", y = "Protocol Adherence")
+  labs(x = "Creatinine after 48h", y = "CRP", color = "age")
 
 ggplot(kidney_full, aes(baseline_creat, delta_creatinine_48h, color = protocol_adherence)) +
   geom_point(alpha = 0.6) +
@@ -132,10 +155,11 @@ ggplot(kidney_full, aes(baseline_creat, protocol_adherence, color = delta_creati
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
   labs(x = "Baseline Creatinine", y = "Protocol Adherence", color = "Creatinine after 48h less than 0")
 ```
-Creatinine is a waste product which is produced by normal muscle breakdown and glomerular filtration.Levels are stable in homeostatic conditions, it accumulates in the blood during decline of kidney function. Rises in creatinine can be an early indicator of kidney issues allowing earlier intervention by HCPs. It's use in this dataset allows us to see both long term and short term condition changes due to the frequency at which it is monitored.
+
 
 ```{r}
 #examining relationship between sofa >7 on variable expression
+
 ggplot(kidney_full, aes(sofa > 7, delta_creatinine_48h)) +
   geom_boxplot() +
   labs(x = "SOFA Score >7", y = "Delta Creatinine (after 48h)")
@@ -196,6 +220,8 @@ CRP:C-Reactive Protein is produced by the liver in response to inflammation. It 
 
 In the particular cohort we are dealing with here, CRP is particularly valuable.Inflammatory responses in ICU can be common indicators of sepsis, trauma, surgery or organ failure and rising or persistently high CRP levels can be an indicator of lack of treatment response. CRP is measured through routine blood tests making it also accessible and practical for serial monitoring at bedside settings. In our analysis CRP acts as an important clinical marker for understanding how inflammatory burden interacts with kidney function and other factors in the patient group.
 
+Values: with a normal level generally below 3-10 mg/L (or 1mg/dL). Levels between 10-100 mg/L indicate moderate inflammation (infection, chronic disease), while levels >100 mg/L suggest severe inflammation or acute bacterial infection.
+
 ```{r}
 lab_markers <- c("bun", "crp", "albumin", "lactate", "map_min", "sofa")
 cors <- sapply(lab_markers, function(g) {
@@ -239,27 +265,27 @@ ggplot(top_mark, aes(x = Mark, y = corr, fill = corr > 0)) +
 Linear Regression:
 
 ```{r}
-ggplot(kidney_full, aes(x = sofa, y = delta_creatinine_48h, colour = protocol_adherence)) +
-geom_point(alpha = 0.7) +
-geom_smooth(method = "lm", se = FALSE, color = "black") +
-labs( x = "SOFA Score", y = "Delta Creatinine (48h)", color = "protocol adherence") +
-theme_minimal()
-
 ggplot(kidney_full, aes(x = baseline_creat, y = delta_creatinine_48h, colour = protocol_adherence)) +
 geom_point(alpha = 0.7) +
 geom_smooth(method = "lm", se = FALSE, color = "black") +
 labs( x = "Baseline Creatinine", y = "Delta Creatinine (48h)", color = "protocol adherence") +
 theme_minimal()
 
-ggplot(kidney_full, aes(x = lactate, y = delta_creatinine_48h, colour = protocol_adherence)) +
+ggplot(kidney_full, aes(x = baseline_creat, y = delta_creatinine_48h, colour = age)) +
 geom_point(alpha = 0.7) +
 geom_smooth(method = "lm", se = FALSE, color = "black") +
-labs( x = "Serum Lactate", y = "Delta Creatinine (48h)", color = "protocol adherence") +
+labs( x = "Baseline Creatinine", y = "Delta Creatinine (48h)", color = "Age") +
+theme_minimal()
+
+ggplot(kidney_full, aes(x = crp, y = delta_creatinine_48h, colour = protocol_adherence)) +
+geom_point(alpha = 0.7) +
+geom_smooth(method = "lm", se = FALSE, color = "red") +
+labs( x = "CRP", y = "Delta Creatinine (48h)", color = "protocol adherence") +
 theme_minimal()
 
 ggplot(kidney_full, aes(x = baseline_creat, y = protocol_adherence, colour = delta_creatinine_48h < 0 )) +
 geom_point(alpha = 0.7) +
-geom_smooth(method = "lm", se = FALSE, color = "black") +
+geom_smooth(method = "lm", se = FALSE, color = "green") +
 labs( x = "Baseline Creatinine", y = "Protocol Adherence", color = "Creatinine change after 48h") +
 theme_minimal()
 ```
@@ -552,6 +578,8 @@ metrics_train
 metrics_test
 ```
 
+Result: On average patients with a high adherance levels had a decrease in creatinine level of -0.09340354 after 48 hours
+
 Main Treatment effect:
 
 ```{r}
@@ -562,15 +590,572 @@ suppressPackageStartupMessages({
   library(tibble)
   
 })
+#checking the variables in OLS
+formula(mod_ols)
 
 # OLS: adjusted main effect of treatment (chemo vs reference)
 
 coef_ols <- tidy(mod_ols, conf.int = TRUE) %>%
-filter(term != "(intercept)")
+filter(grepl("^adherence_level", term))
 coef_ols
-
-#Try upload here 
 ```
+
+```{r}
+# Regularized models: report the treatment coefficient (main effect)
+grab_coef <- function(m, name) {
+b <- as.matrix(coef(m))
+if (!name %in% rownames(b)) return(NA_real_)
+as.numeric(b[name, 1])
+}
+
+main_effects_tbl <- tibble(
+Model = c("OLS","LASSO","Ridge","Elastic Net"),
+Adherence_To_Protocol = c(
+coef(mod_ols)[["adherence_levelHigh adherence"]],
+grab_coef(mod_lasso, "adherence_levelHigh adherence"),
+grab_coef(mod_ridge, "adherence_levelHigh adherence"),
+grab_coef(mod_enet,  "adherence_levelHigh adherence")
+)
+)
+main_effects_tbl
+#adherence_levelHigh adherence is the coefficient of the variable adherence_level.
+```
+
+Main Effect Associations:
+
+We are comparing the different models using our clinical predictors. The columns in the dataframe are renamed and the glmnet object is converted into a matrix of coefficients. We then filtered for only the variables we want and presented the model results together to display which predictors are significant and stable across models.
+
+```{r}
+# --- Clinical (no interactions): OLS + LASSO + RIDGE + ENET ------------------
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(broom)
+  library(stringr)
+  library(tibble)
+})
+
+# 1) OLS clinical table (with CIs and p-values)
+
+ols_tidy <- tidy(mod_ols, conf.int = TRUE)
+
+ols_clinical <- ols_tidy %>%
+  filter(
+    term == "age" |
+    term == "sofa" |
+    term == "lactate" |
+    term == "map_min" |
+    term == "baseline_creat" |
+    term == "bun" |
+    term == "crp" |
+    term == "albumin"
+  ) %>%
+  arrange(p.value) %>%
+  rename(
+    beta_ols    = estimate,
+    se_ols      = std.error,
+    t_ols       = statistic,
+    p_ols       = p.value,
+    ci_low_ols  = conf.low,
+    ci_high_ols = conf.high
+  )
+
+# 2) Helper to extract glmnet coefficients ------------------------------------
+
+get_glmnet_coefs <- function(mod_glmnet, keep_regex = NULL, colname = "beta"){
+  B <- as.matrix(coef(mod_glmnet))
+  
+  tab <- tibble(
+    term = rownames(B),
+    !!colname := as.numeric(B[, 1])
+  ) %>%
+    filter(term != "(Intercept)")
+  
+  if (!is.null(keep_regex)) {
+    tab <- tab %>% filter(str_detect(term, keep_regex))
+  }
+  
+  tab
+}
+
+# Regex to keep only continuous kidney predictors
+keep_regex_kidney <- paste(
+  c("^age$",
+    "^sofa$",
+    "^lactate$",
+    "^map_min$",
+    "^baseline_creat$",
+    "^bun$",
+    "^crp$",
+    "^albumin$"),
+  collapse = "|"
+)
+
+lasso_tab <- get_glmnet_coefs(mod_lasso,
+                              keep_regex = keep_regex_kidney,
+                              colname = "beta_lasso")
+
+ridge_tab <- get_glmnet_coefs(mod_ridge,
+                              keep_regex = keep_regex_kidney,
+                              colname = "beta_ridge")
+
+enet_tab  <- get_glmnet_coefs(mod_enet,
+                              keep_regex = keep_regex_kidney,
+                              colname = "beta_enet")
+
+# 3) Join everything ----------------------------------------------------------
+
+clin_compare <- ols_clinical %>%
+  select(term, beta_ols, se_ols, t_ols, p_ols,
+         ci_low_ols, ci_high_ols) %>%
+  left_join(lasso_tab, by = "term") %>%
+  left_join(ridge_tab, by = "term") %>%
+  left_join(enet_tab,  by = "term") %>%
+  mutate(
+    beta_lasso = coalesce(beta_lasso, 0),
+    beta_ridge = coalesce(beta_ridge, 0),
+    beta_enet  = coalesce(beta_enet,  0)
+  )
+
+data.frame(clin_compare)
+```
+
+CHANGEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+In order to visualise the main effect association we first had to create an importance metric column from our object clin_compare. We then plotted each predictor with it's strength, with larger bars representing stronger predictors.
+
+```{r}
+clin_long <- clin_compare %>%
+  select(term, beta_ols, t_ols, beta_lasso, beta_ridge, beta_enet) %>%
+  tidyr::pivot_longer(
+    cols = -c(term, t_ols),
+    names_to = "Model",
+    values_to = "value"
+  ) %>%
+  mutate(
+    importance = case_when(
+      Model == "beta_ols" ~ abs(t_ols),
+      TRUE ~ abs(value)
+    ),
+    Model = case_when(
+      Model == "beta_ols"   ~ "OLS",
+      Model == "beta_lasso" ~ "LASSO",
+      Model == "beta_ridge" ~ "Ridge",
+      Model == "beta_enet"  ~ "Elastic Net"
+    )
+  )
+
+ggplot(clin_long,
+       aes(x = reorder(term, importance), y = importance)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~ Model, scales = "free_y") +
+  labs(
+    x = "Predictor",
+    y = "Importance (|t| for OLS; |β| for penalized models)",
+    title = "Clinical Predictor Importance by Model"
+  ) +
+  theme_minimal(base_size = 12)
+```
+Results:
+The OLS model showed predictors such as Lactate, SOFA, Map_min and baseline_creat have a strong association with our response variable. LASSO, Elastic Net and Ridge showed no clear predictors with strong correlation. This could mean that our sample size is too small. 
+
+Tree Methods
+
+Setting up:
+```{r}
+# Core data/plot
+req_pkgs <- c(
+  "dplyr", "ggplot2", "tidyr", "readr", "tibble", "gridExtra",
+  # Trees
+  "rpart", "rpart.plot", "partykit",
+  # Random Forests (pick one or use both)
+  "ranger",        # fast RF (recommended)
+  "randomForest",  # classic RF implementation
+  # Gradient Boosting
+  "xgboost", "Matrix",  # Matrix for sparse design matrices
+  # Model interpretation (optional but handy)
+  "vip",   # variable importance plots
+  "pdp",   # partial dependence
+  "iml"    # ICE/SHAP-like tools (optional)
+)
+
+# Install any missing
+to_install <- setdiff(req_pkgs, rownames(installed.packages()))
+if (length(to_install) > 0) {
+  install.packages(to_install, dependencies = TRUE)
+}
+
+# Load all (silently)
+invisible(lapply(req_pkgs, require, character.only = TRUE))
+```
+
+Dividing the dataset into training and testing:
+
+```{r}
+# 2) Stratified 70/30 split by treatment
+set.seed(42)
+split_strat <- function(df, strat_col, p_train = 0.7) {
+  idx_tr <- unlist(tapply(seq_len(nrow(df)), df[[strat_col]], function(ix) {
+    sample(ix, size = floor(p_train * length(ix)))
+  }))
+  list(train = sort(idx_tr), test = setdiff(seq_len(nrow(df)), idx_tr))
+}
+
+sp <- split_strat(kidney_full, strat_col = "adherence_level", p_train = 0.7)
+train <- kidney_full[sp$train, , drop = FALSE]
+test  <- kidney_full[sp$test,  , drop = FALSE]
+```
+
+```{r}
+# 3) Drop columns that should NOT enter models
+#    - patient_id: identifier only
+#    - high_response: binary version of the outcome (leakage if modeling response_percent)
+#    - baseline_tumor_mm, post_tumor_mm: strongly deterministically related to response_percent
+drop_cols <- intersect(
+  names(train),
+  c("patient_id", "site", "protocol_adherence", "baseline_creat", "creatinine_change")
+)
+train_nopii <- dplyr::select(train, -dplyr::all_of(drop_cols))
+test_nopii  <- dplyr::select(test,  -dplyr::all_of(drop_cols))
+
+# 4) Check outcome presence
+#stopifnot("response_percent" %in% names(train_nopii))
+```
+
+```{r}
+# 5) Build a consistent design (for glmnet / xgboost, etc.)
+#    Use TRAIN to “freeze” factor levels and dummy columns
+f_ols   <- delta_creatinine_48h ~ .
+ols_tmp <- lm(f_ols, data = train_nopii)
+ols_terms <- terms(ols_tmp)
+
+# Model matrices (no intercept column)
+X_train <- model.matrix(ols_terms, data = train_nopii)[, -1, drop = FALSE]
+X_test  <- model.matrix(ols_terms, data = test_nopii)[,  -1, drop = FALSE]
+y_train <- train_nopii$delta_creatinine_48h
+y_test  <- test_nopii$delta_creatinine_48h
+```
+
+```{r}
+# 6) Small helpers for later evaluations
+mae  <- function(y, yhat) mean(abs(y - yhat))
+rmse <- function(y, yhat) sqrt(mean((y - yhat)^2))
+eval_perf <- function(y_true, y_pred) {
+  tibble::tibble(MAE = mae(y_true, y_pred), RMSE = rmse(y_true, y_pred))
+}
+```
+
+
+Interaction Plots: 
+
+For the plots below we are using delta_creatinine_48h as our outcome, this is plotted using the average (mean) creatinine change per group. Adherence level as our grouping variable. Lactate, SOFA and Map_min are used as the continuous predictors for the three plots. Each predictor is aggregated into 4 breaks for visualisation purposes. 
+
+```{r}
+agg_inter <- kidney_full %>%
+  mutate(age = cut(age, breaks = 4)) %>%
+  group_by(age, adherence_level) %>%
+  summarise(
+    mean_creat_change = mean(delta_creatinine_48h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(
+  agg_inter,
+  aes(x = age,
+      y = mean_creat_change,
+      color = adherence_level,
+      group = adherence_level)
+) +
+  geom_line(linewidth = 1.3) +
+  geom_point(size = 3) +
+  labs(
+    title = "Interaction Plot (Kidney Dataset)",
+    subtitle = "Parallel lines → effect of age across adherence levels",
+    x = "Age",
+    y = "Mean Creatinine Change",
+    color = "Adherence Level"
+  ) +
+  theme_minimal(base_size = 14)
+```
+This plot indicates that there is a much stronger adherence dependent variation in mean creatinine change of patients in relation to age. There was a much higher change in patients in the low adherance group when compared to their age group counterparts who had a high adherance. 
+
+```{r}
+agg_inter <- kidney_full %>%
+  mutate(lactate_group = cut(lactate, breaks = 4)) %>%
+  group_by(lactate_group, adherence_level) %>%
+  summarise(
+    mean_creat_change = mean(delta_creatinine_48h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(
+  agg_inter,
+  aes(x = lactate_group,
+      y = mean_creat_change,
+      color = adherence_level,
+      group = adherence_level)
+) +
+  geom_line(linewidth = 1.3) +
+  geom_point(size = 3) +
+  labs(
+    title = "Interaction Plot (Kidney Dataset)",
+    subtitle = "Parallel lines → effect of lactate similar across adherence levels",
+    x = "Lactate (Grouped)",
+    y = "Mean Creatinine Change",
+    color = "Adherence Level"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+There appears to be a strong correlation between lactate and mean creatinine change. There also seems to be an adhearance dependent variability between the patients. High adhearance seemed to plateau between 0.5 and 0.75 mg/L change where as the low adhearance continued to change much further. This could indicate that the low adhearance group struggled to regulate the bodies inflammatory response or were more susceptible to develop a complication in this cohort. 
+
+```{r}
+agg_inter2 <- kidney_full %>%
+  mutate(sofa_group = cut(sofa, breaks = 4)) %>%
+  group_by(sofa_group, adherence_level) %>%
+  summarise(
+    mean_creat_change = mean(delta_creatinine_48h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(
+  agg_inter2,
+  aes(x = sofa_group,
+      y = mean_creat_change,
+      color = adherence_level,
+      group = adherence_level)
+) +
+  geom_line(linewidth = 1.3) +
+  geom_point(size = 3) +
+  labs(
+    title = "Interaction Plot (Kidney Dataset)",
+    subtitle = "Parallel lines → effect of SOFA similar across adherence levels",
+    x = "SOFA (Grouped)",
+    y = "Mean Creatinine Change",
+    color = "Adherence Level"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+agg_inter3 <- kidney_full %>%
+  mutate(mapmin_group = cut(map_min, breaks = 4)) %>%
+  group_by(mapmin_group, adherence_level) %>%
+  summarise(
+    mean_creat_change = mean(delta_creatinine_48h, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(
+  agg_inter3,
+  aes(x = mapmin_group,
+      y = mean_creat_change,
+      color = adherence_level,
+      group = adherence_level)
+) +
+  geom_line(linewidth = 1.3) +
+  geom_point(size = 3) +
+  labs(
+    title = "Interaction Plot (Kidney Dataset)",
+    subtitle = "Parallel lines → effect of MAP_MIN similar across adherence levels",
+    x = "Mean Arterial Pressure (Grouped)",
+    y = "Mean Creatinine Change",
+    color = "Adherence Level"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Running a tree and Pruning via 1-SE rule:
+```{r}
+# Grow a CART regression tree
+kidney_tree <- rpart(
+  delta_creatinine_48h ~ .,
+  data = train_nopii,
+  method = "anova",
+  control = rpart.control(cp = 0.001, maxdepth = 8, minsplit = 30)
+)
+
+# Prune via 1-SE rule
+printcp(kidney_tree)
+```
+
+```{r}
+best_row <- which.min(kidney_tree$cptable[,"xerror"])
+xerr_min <- kidney_tree$cptable[best_row, "xerror"]
+xstd_min <- kidney_tree$cptable[best_row, "xstd"]
+cp_1se   <- kidney_tree$cptable[kidney_tree$cptable[,"xerror"] <= xerr_min + xstd_min, "CP"][1]
+kidney_pruned <- prune(kidney_tree, cp = cp_1se)
+
+# Human-readable rules (if/else)
+rpart.plot::rpart.rules(kidney_pruned, style = "tallw")
+```
+Visualising grown tree. Full tree is too complex and branched to visualise clearly, therefore the pruned tree is plotted instead.
+```{r}
+# Visualize grown and pruned trees
+rpart.plot(kidney_pruned, type = 2, extra = 101, box.palette = "Blues",
+           main = "Kidney dataset tree (Pruned 1-SE)")
+```
+
+```{r}
+pred_tr <- predict(kidney_pruned, newdata = train_nopii)
+pred_te <- predict(kidney_pruned, newdata = test_nopii)
+
+perf <- dplyr::bind_rows(
+  tibble(Split="Train", MAE=mae(train_nopii$delta_creatinine_48h, pred_tr),
+         RMSE=rmse(train_nopii$delta_creatinine_48h, pred_tr)),
+  tibble(Split="Test",  MAE=mae(test_nopii$delta_creatinine_48h,  pred_te),
+         RMSE=rmse(test_nopii$delta_creatinine_48h,  pred_te))
+)
+perf
+```
+
+```{r}
+ggplot(
+  tibble(truth = test_nopii$delta_creatinine_48h, pred = pred_te),
+  aes(truth, pred)
+) +
+  geom_point(alpha = 0.35) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Observed Creatinine change", y = "Tree prediction",
+       title = "Pruned tree: observed vs predicted (test)") +
+  theme_minimal()
+```
+
+Bootstrap Aggregating
+
+Setting up test and train for dataset:
+```{r}
+set.seed(2025)
+
+library(dplyr)
+
+# 1) Train/test split (70/30) -------------------------
+n <- nrow(kidney_full)
+idx_train <- sample(seq_len(n), size = 0.7 * n)
+
+train <- kidney_full[idx_train, ]
+test  <- kidney_full[-idx_train, ]
+
+# 2) True outcomes ------------------------------------
+y_train <- train$delta_creatinine_48h
+y_test  <- test$delta_creatinine_48h
+```
+
+
+Random Forests:
+
+Code is adjusted to fit the package randomForest.
+```{r}
+library(randomForest)
+
+rf_fit <- randomForest(
+  delta_creatinine_48h ~ . 
+    - patient_id 
+    - site 
+    - creatinine_change
+    - protocol_adherence
+    - baseline_creat,
+  data       = train,
+  ntrees  = 500,
+  mtry       = floor(sqrt(ncol(train) - 6)),  # approx: drop 5 predictors + outcome
+  importance = TRUE
+)
+```
+
+
+```{r}
+# Predictions ------------------------------------------------------
+
+rf_pred_train <- predict(rf_fit, newdata = train)
+rf_pred_test  <- predict(rf_fit, newdata = test)
+
+# Performance ------------------------------------------------------
+
+rf_perf_train <- eval_perf(y_train, rf_pred_train)
+rf_perf_test  <- eval_perf(y_test,  rf_pred_test)
+
+rf_perf_train
+```
+
+```{r}
+rf_perf_test
+```
+
+XGboost:
+
+```{r}
+library(xgboost)
+
+# 1) Build predictor matrices -------------------------------------
+
+cols_to_drop <- c(
+  "patient_id",
+  "site",
+  "creatinine_change",
+  "protocol_adherence",
+  "baseline_creat",
+  "delta_creatinine_48h")
+
+X_train <- model.matrix(
+  ~ .,
+  data = train |> select(-all_of(cols_to_drop))
+)
+
+X_test <- model.matrix(
+  ~ .,
+  data = test  |> select(-all_of(cols_to_drop))
+)
+
+# Optional: check dimensions
+dim(X_train)
+```
+```{r}
+dim(X_test)
+```
+
+```{r}
+# 2) Convert to DMatrix -------------------------------------------
+
+dtrain <- xgb.DMatrix(data = X_train, label = y_train)
+dtest  <- xgb.DMatrix(data = X_test,  label = y_test)
+
+# 3) Basic XGBoost hyperparameters --------------------------------
+
+xgb_params <- list(
+  objective        = "reg:squarederror",
+  eta              = 0.05,   # learning rate
+  max_depth        = 4,
+  subsample        = 0.7,    # row subsampling
+  colsample_bytree = 0.7     # column subsampling
+)
+
+# 4) Train XGBoost model ------------------------------------------
+
+xgb_fit <- xgb.train(
+  params    = xgb_params,
+  data      = dtrain,
+  nrounds   = 300,
+  watchlist = list(train = dtrain),
+  verbose   = 0
+)
+
+# 5) Predictions ---------------------------------------------------
+
+xgb_pred_train <- predict(xgb_fit, dtrain)
+xgb_pred_test  <- predict(xgb_fit, dtest)
+
+# 6) Performance ---------------------------------------------------
+
+xgb_perf_train <- eval_perf(y_train, xgb_pred_train)
+xgb_perf_test  <- eval_perf(y_test,  xgb_pred_test)
+
+xgb_perf_train
+```
+
+```{r}
+xgb_perf_test
+```
+
 
 ```
 
