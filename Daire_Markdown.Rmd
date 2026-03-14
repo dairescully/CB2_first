@@ -966,6 +966,12 @@ ggplot(
 ```
 
 Running a tree and Pruning via 1-SE rule:
+
+Classification and Regression Trees (CART): Classification and Regression Trees (CART) is a flexible framework that handles both continuous and categorical outcomes.The algorithm works by recursively splitting the data into subgroups based on predictor values, creating an intuitive tree structure where each final subgroup makes a constant prediction.
+For regression, the tree splits data to minimize within-node variance creating groups of patients with similar tumor response based on factors like dose intensity or gene expression. For classification, it uses the Gini index to measure node "impurity" (how mixed the classes are) and selects splits that create the purest possible groups of high versus low responders.
+The clinical strength of CART lies in its interpretability. Each path through the tree translates directly into a practical rule. This mirrors clinical reasoning and makes the model's predictions transparent and actionable, while still capturing complex nonlinear relationships that simpler models might miss.
+
+
 ```{r}
 # Grow a CART regression tree
 kidney_tree <- rpart(
